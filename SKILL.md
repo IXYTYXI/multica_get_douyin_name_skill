@@ -1,12 +1,12 @@
 ---
 name: douyin-author-scraper
-description: "Use when the user wants to scrape a single Douyin AUTHOR's homepage — the author's follower count (粉丝量) plus a selected slice of their posts (skipping pinned videos), including like/comment/collect counts, the image/video files, and the posts' comments — and write it all to a Feishu bitable. This is author-page scraping ONLY; for keyword search use the separate douyin-scraper skill."
+description: "Use when the user wants to scrape Douyin AUTHOR homepages — by name or URL. Supports single or batch mode: collects follower count (粉丝量), a selected slice of posts (skipping pinned videos) with like/comment/collect counts, image/video files, and comments (L1+L2), writing everything to a Feishu bitable. Can search authors by nickname instead of requiring URLs. This is author-page scraping ONLY; for keyword search use the separate douyin-scraper skill."
 user-invocable: true
 ---
 
 # Douyin Author Homepage Scraper
 
-Single purpose: given one author's homepage URL, scrape
+Scrape one or more Douyin author homepages — **by name or URL**. Given an author,
 
 1. **粉丝量 (follower count)** and the rest of the author profile, and
 2. a selected slice of the author's posts — **skipping pinned videos** — with
@@ -40,6 +40,35 @@ i.e. the **4th–8th** posts. Both are tunable (`--recent-count`, `--skip-top`).
 
 ## Run it
 
+### 按名字搜索作者
+
+不需要知道主页 URL，直接用昵称搜索：
+
+```bash
+# 搜索作者，返回主页链接和粉丝数
+python main.py search "清华凌霄学习舅"
+```
+
+### 批量模式（推荐 — 支持名字和 URL 混合）
+
+传入作者昵称或主页 URL，自动建一张多维表格，所有作者的数据写入同一张表：
+
+```bash
+# 直接用昵称批量采集（自动搜索 → 找到主页 → 采集）
+python main.py scrape-batch 清华凌霄学习舅 于泽老师的思维课 成祥老师带你重学英语
+
+# 昵称和 URL 混合
+python main.py scrape-batch 清华凌霄学习舅 "https://www.douyin.com/user/MS4wLjABAAAA..."
+
+# 指定飞书文件夹 + CDP 模式
+python main.py scrape-batch 作者A 作者B --folder <飞书文件夹> --cdp http://localhost:9222
+
+# 跳过评论 / 自定义取第4-8条
+python main.py scrape-batch 作者A 作者B --no-comments --skip-top 3 --recent-count 5
+```
+
+所有参数（`--skip-top`、`--recent-count`、`--no-comments`、`--cdp` 等）与单作者模式相同。
+
 ### CDP 模式（推荐 — 连接已登录的 Chrome）
 
 不导出 Cookie，直接复用浏览器登录态：
@@ -56,28 +85,7 @@ python main.py scrape-author "https://www.douyin.com/user/MS4wLjABAAAA..." --fol
 
 也可以在 `.env` 配 `CDP_ENDPOINT=http://localhost:9222`，省略 `--cdp` 参数。
 
-### 批量模式（多个作者一次采集）
-
-传入多个作者主页 URL，自动建一张多维表格，所有作者的数据写入同一张表：
-
-```bash
-# 批量采集 3 个作者（CDP 模式）
-python main.py scrape-batch \
-  "https://www.douyin.com/user/作者A_sec_uid" \
-  "https://www.douyin.com/user/作者B_sec_uid" \
-  "https://www.douyin.com/user/作者C_sec_uid" \
-  --folder <飞书文件夹> --cdp http://localhost:9222
-
-# 批量采集（Cookie 模式）
-python main.py scrape-batch URL1 URL2 URL3 --folder <飞书文件夹>
-
-# 跳过评论 / 自定义取第4-8条
-python main.py scrape-batch URL1 URL2 --no-comments --skip-top 3 --recent-count 5
-```
-
-所有参数（`--skip-top`、`--recent-count`、`--no-comments`、`--cdp` 等）与单作者模式相同。
-
-### Cookie 模式（传统方式）
+### 单作者模式（Cookie 方式）
 
 ```bash
 # One shot: create a NEW 5-table bitable AND scrape the author (profile + posts + comments)
