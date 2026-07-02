@@ -41,6 +41,9 @@ AUTHOR_RECENT_COUNT = int(os.environ.get("AUTHOR_RECENT_COUNT", "5"))
 SKIP_COMMENTS = os.environ.get("SKIP_COMMENTS", "").lower() in ("1", "true", "yes")
 APP_TOKEN = os.environ.get("FEISHU_APP_TOKEN", "")
 
+DATE_FROM = 0
+DATE_TO = 0
+
 MAX_COMMENTS_PER_POST = int(os.environ.get("MAX_COMMENTS_PER_POST", "100"))
 MAX_REPLIES_PER_L1 = int(os.environ.get("MAX_REPLIES_PER_L1", "20"))
 MAX_REPLIES_PER_POST = int(os.environ.get("MAX_REPLIES_PER_POST", "60"))
@@ -521,7 +524,8 @@ async def _fetch_author_awemes(client, sec_uid, need):
 
 
 def _select_author_posts(awemes):
-    """From an author's post-list pick the target slice, skipping pinned videos."""
+    """From an author's post-list pick the target slice, skipping pinned videos
+    and optionally filtering by date range (DATE_FROM / DATE_TO)."""
     pinned = [a for a in awemes if a.get('is_top')]
     if pinned:
         base = [a for a in awemes if not a.get('is_top')]
@@ -529,6 +533,12 @@ def _select_author_posts(awemes):
     else:
         base = awemes[AUTHOR_TOP_SKIP:]
         note = f'no is_top flag returned; skipped first {AUTHOR_TOP_SKIP} as pinned'
+    if DATE_FROM or DATE_TO:
+        before = len(base)
+        base = [a for a in base
+                if (not DATE_FROM or a.get('create_time', 0) >= DATE_FROM)
+                and (not DATE_TO or a.get('create_time', 0) <= DATE_TO)]
+        note += f'; date filter: {before} -> {len(base)} post(s)'
     return base[:AUTHOR_RECENT_COUNT], note
 
 

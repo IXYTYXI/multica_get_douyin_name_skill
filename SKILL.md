@@ -38,6 +38,20 @@ The selector **drops detected pinned posts and keeps the next 5**. If the API
 does not return `is_top`, it falls back to **skipping the first 3** as pinned —
 i.e. the **4th–8th** posts. Both are tunable (`--recent-count`, `--skip-top`).
 
+## Date range filtering
+
+Use `--date-from` and/or `--date-to` to only keep posts published within a time
+window. Format: `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`. The filter runs after
+pinned-post removal but before the `--recent-count` cap, so you can combine them:
+
+```bash
+# Only posts from June 2026
+python main.py scrape-batch 作者A --date-from 2026-06-01 --date-to 2026-06-30
+
+# Posts from the last week, keep up to 10
+python main.py scrape-batch 作者A --date-from 2026-06-25 --recent-count 10
+```
+
 ## Run it
 
 ### 按名字搜索作者
@@ -67,7 +81,7 @@ python main.py scrape-batch 作者A 作者B --folder <飞书文件夹> --cdp htt
 python main.py scrape-batch 作者A 作者B --no-comments --skip-top 3 --recent-count 5
 ```
 
-所有参数（`--skip-top`、`--recent-count`、`--no-comments`、`--cdp` 等）与单作者模式相同。
+所有参数（`--skip-top`、`--recent-count`、`--no-comments`、`--cdp`、`--date-from`、`--date-to` 等）与单作者模式相同。
 
 ### CDP 模式（推荐 — 连接已登录的 Chrome）
 
