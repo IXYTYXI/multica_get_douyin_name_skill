@@ -285,6 +285,7 @@ async def _fetch_replies(page, aweme_id, comment_id, parent_text_user, max_repli
                 '评论者ID': user.get('uid', ''),
                 '父评论ID': comment_id,
                 '回复对象': reply_to,
+                '所属一级评论作者': parent_text_user,
                 '所属作品ID': aweme_id,
                 '点赞数': r.get('digg_count', 0),
                 '评论时间': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ct)) if ct else '',

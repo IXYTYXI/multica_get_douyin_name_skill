@@ -150,8 +150,10 @@ def scrape_author(url, folder, name, recent_count, skip_top,
     默认跳过置顶视频后取最近 5 条（检测到 is_top 则丢弃置顶，否则回退为跳过前 --skip-top 条，
     即第4-8条）。新建 5 张表：作者信息 / 视频作品 / 图文作品 / 一级评论 / 二级评论。
     """
-    if not DOUYIN_COOKIE:
+    if not DOUYIN_COOKIE and not structure_only:
         click.echo("⚠️ 未检测到 DOUYIN_COOKIE，请先在 .env 配置或运行 `python main.py login`。")
+        click.echo("如果只需创建表结构，请加 --structure-only。")
+        return
     asyncio.run(_scrape_author(
         url, _folder_token(folder), name, recent_count, skip_top,
         no_comments, headed, ui_comments, structure_only,
