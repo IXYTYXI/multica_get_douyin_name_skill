@@ -219,6 +219,86 @@ async def _scrape_author(url, folder_token, name, recent_count, skip_top,
                "IMAGE_TABLE_ID / COMMENT_L1_TABLE_ID / COMMENT_L2_TABLE_ID + DOUYIN_AUTHOR_URL，再跑 python pipeline.py。")
 
 
+# --------------------------------------------------------------------------- #
+# scrape-batch — batch mode for multiple authors                                #
+# --------------------------------------------------------------------------- #
+@cli.command(name="scrape-batch")
+@click.argument("urls", nargs=-1, required=True)
+@click.option("--folder", help="飞书文件夹 token 或 URL（新建多维表格的位置；留空建在应用空间）")
+@click.option("--name", default="抖音作者数据-批量", help="新建多维表格的名称")
+@click.option("--recent-count", type=int, default=5, help="保留的作品数量（默认最近 5 条）")
+@click.option("--skip-top", type=int, default=3,
+              help="检测不到置顶标记(is_top)时回退跳过的前 N 条置顶视频（默认 3，即取第4-8条）")
+@click.option("--no-comments", is_flag=True, help="只抓作者信息+作品，跳过一/二级评论")
+@click.option("--headless", is_flag=True, help="使用无头浏览器（默认带界面，降低被识别封号风险）")
+@click.option("--ui-comments", is_flag=True, help="用模拟点击(真人登录态)抓评论，含二级评论")
+@click.option("--cdp", "cdp_endpoint", default="",
+              help="连接已登录 Chrome 的 CDP 端点（如 http://localhost:9222），免 Cookie")
+def scrape_batch(urls, folder, name, recent_count, skip_top,
+                 no_comments, headless, ui_comments, cdp_endpoint):
+    """批量采集多个作者主页：传入多个作者主页 URL，一次建一张多维表格，所有作者的数据写入同一张表。
+
+    用法示例：
+      python main.py scrape-batch URL1 URL2 URL3 --folder <飞书文件夹>
+      python main.py scrape-batch URL1 URL2 --cdp http://localhost:9222
+    """
+    if not urls:
+        click.echo("请至少提供一个作者主页 URL。")
+        return
+    cdp = cdp_endpoint or CDP_ENDPOINT
+    if not DOUYIN_COOKIE and not cdp:
+        click.echo("⚠️ 未检测到 DOUYIN_COOKIE 或 CDP 端点。")
+        click.echo("方式一: 在 .env 配置 DOUYIN_COOKIE 或运行 `python main.py login`")
+        click.echo("方式二: 启动 Chrome 时带 --remote-debugging-port=9222，登录抖音后用 --cdp http://localhost:9222")
+        return
+    asyncio.run(_scrape_batch(
+        list(urls), _folder_token(folder), name, recent_count, skip_top,
+        no_comments, headless, ui_comments, cdp,
+    ))
+
+
+async def _scrape_batch(urls, folder_token, name, recent_count, skip_top,
+                        no_comments, headless, ui_comments, cdp_endpoint=""):
+    click.echo(f"批量模式：{len(urls)} 个作者")
+
+    feishu = FeishuBitable()
+    try:
+        ids = feishu.create_author_bitable(name, folder_token)
+    except RuntimeError as e:
+        msg = str(e)
+        click.echo(f"新建多维表格失败: {msg}")
+        if "DriveNodePermNotAllow" in msg or "1254701" in msg:
+            click.echo("原因: 自建应用对该文件夹没有写入权限。")
+            click.echo("请在飞书里把该文件夹共享给你的自建应用并授予「可编辑」，")
+            click.echo("并确认应用已开通 drive:drive 与 bitable:app 权限且已发布。")
+        feishu.close()
+        return
+    feishu.close()
+
+    import pipeline
+    pipeline.APP_TOKEN = ids["app_token"]
+    pipeline.AUTHOR_TABLE_ID = ids["author_table_id"]
+    pipeline.VIDEO_TABLE_ID = ids["video_table_id"]
+    pipeline.IMAGE_TABLE_ID = ids["image_table_id"]
+    pipeline.COMMENT_L1_TABLE_ID = ids["comment_l1_table_id"]
+    pipeline.COMMENT_L2_TABLE_ID = ids["comment_l2_table_id"]
+    pipeline.AUTHOR_RECENT_COUNT = recent_count
+    pipeline.AUTHOR_TOP_SKIP = skip_top
+    pipeline.SKIP_COMMENTS = no_comments
+    if cdp_endpoint:
+        pipeline.USE_CDP = cdp_endpoint
+    if headless:
+        pipeline.HEADLESS = True
+    if ui_comments:
+        pipeline.USE_UI_COMMENTS = True
+    await pipeline.main_batch(urls)
+
+    click.echo(f"\n=== 批量多维表格已就绪 ===")
+    click.echo(f"链接      : {ids['url']}")
+    click.echo(f"app_token : {ids['app_token']}")
+    click.echo(f"共 {len(urls)} 个作者的数据写入上述表格。")
+
+
 @cli.command(name="setup-feishu")
 @click.option("--type", "table_type",
               type=click.Choice(["author", "video", "image", "comment-l1", "comment-l2"]),

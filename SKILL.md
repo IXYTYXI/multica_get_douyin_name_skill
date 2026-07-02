@@ -56,6 +56,27 @@ python main.py scrape-author "https://www.douyin.com/user/MS4wLjABAAAA..." --fol
 
 也可以在 `.env` 配 `CDP_ENDPOINT=http://localhost:9222`，省略 `--cdp` 参数。
 
+### 批量模式（多个作者一次采集）
+
+传入多个作者主页 URL，自动建一张多维表格，所有作者的数据写入同一张表：
+
+```bash
+# 批量采集 3 个作者（CDP 模式）
+python main.py scrape-batch \
+  "https://www.douyin.com/user/作者A_sec_uid" \
+  "https://www.douyin.com/user/作者B_sec_uid" \
+  "https://www.douyin.com/user/作者C_sec_uid" \
+  --folder <飞书文件夹> --cdp http://localhost:9222
+
+# 批量采集（Cookie 模式）
+python main.py scrape-batch URL1 URL2 URL3 --folder <飞书文件夹>
+
+# 跳过评论 / 自定义取第4-8条
+python main.py scrape-batch URL1 URL2 --no-comments --skip-top 3 --recent-count 5
+```
+
+所有参数（`--skip-top`、`--recent-count`、`--no-comments`、`--cdp` 等）与单作者模式相同。
+
 ### Cookie 模式（传统方式）
 
 ```bash

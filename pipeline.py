@@ -718,5 +718,82 @@ async def main_author():
             await browser.close()
 
 
+async def main_batch(urls):
+    """Batch mode: scrape multiple author homepages into one shared bitable."""
+    global AUTHOR_URL, KEYWORD, APPEND
+
+    print(f'=== Batch mode: {len(urls)} authors ===')
+
+    cdp = USE_CDP
+    browser = None
+    page = None
+
+    if cdp:
+        print(f'  [CDP] Connecting to Chrome at {cdp} ...')
+        from core.browser import DouyinBrowser
+        browser = DouyinBrowser()
+        await browser.start_cdp(cdp)
+        page = browser.page
+
+    try:
+        total_authors = 0
+        total_videos = 0
+        total_images = 0
+        total_l1 = 0
+        total_l2 = 0
+
+        for i, url in enumerate(urls):
+            AUTHOR_URL = url
+            KEYWORD = url
+
+            print(f'\n{"="*60}')
+            print(f'[{i+1}/{len(urls)}] {url}')
+            print(f'{"="*60}')
+
+            user_info, posts = await scrape_author(page=page)
+
+            if user_info:
+                print(f'  作者: {user_info.nickname} | 粉丝量: {user_info.follower_count} | '
+                      f'获赞: {user_info.total_favorited} | 作品: {user_info.aweme_count}')
+            else:
+                print(f'  WARNING: could not fetch author profile')
+
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            feishu = FeishuBitable(app_token=APP_TOKEN)
+
+            if user_info and AUTHOR_TABLE_ID and 'YOUR_' not in AUTHOR_TABLE_ID:
+                if i == 0 and not APPEND:
+                    feishu.delete_all_records(AUTHOR_TABLE_ID)
+                feishu.write_records([author_to_feishu_record(user_info, now)], AUTHOR_TABLE_ID)
+                total_authors += 1
+
+            if posts:
+                print(f'  Downloading media for {len(posts)} posts...')
+                video_records, image_records = write_posts_to_feishu(posts, feishu)
+                total_videos += len(video_records)
+                total_images += len(image_records)
+            else:
+                print(f'  No posts selected.')
+
+            feishu.close()
+
+            if posts and not SKIP_COMMENTS:
+                l1, l2 = await scrape_and_write_comments(posts, page=page)
+                total_l1 += len(l1)
+                total_l2 += len(l2)
+
+            # After first author, switch to append mode so we don't clear
+            # previously written records for subsequent authors
+            APPEND = True
+
+        print(f'\n=== Batch done ({len(urls)} authors) ===')
+        print(f'Authors: {total_authors}, Videos: {total_videos}, Images: {total_images}')
+        print(f'L1 comments: {total_l1}, L2 replies: {total_l2}')
+
+    finally:
+        if browser:
+            await browser.close()
+
+
 if __name__ == '__main__':
     asyncio.run(main_author())
