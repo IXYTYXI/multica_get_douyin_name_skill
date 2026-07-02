@@ -50,7 +50,7 @@ MAX_REPLIES_PER_POST = int(os.environ.get("MAX_REPLIES_PER_POST", "60"))
 SKIP_L2 = os.environ.get("SKIP_L2", "").lower() in ("1", "true", "yes")
 
 HEADLESS = os.environ.get("DOUYIN_HEADLESS", "0").lower() in ("1", "true", "yes")
-USE_UI_COMMENTS = os.environ.get("USE_UI_COMMENTS", "").lower() in ("1", "true", "yes")
+USE_UI_COMMENTS = os.environ.get("USE_UI_COMMENTS", "1").lower() not in ("0", "false", "no")
 APPEND = os.environ.get("APPEND", "").lower() in ("1", "true", "yes")
 L2_REPLY_TIMEOUT = int(os.environ.get("L2_REPLY_TIMEOUT", "8"))
 L2_DRY_GIVEUP = int(os.environ.get("L2_DRY_GIVEUP", "3"))

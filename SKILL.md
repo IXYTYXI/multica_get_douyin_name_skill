@@ -112,7 +112,7 @@ python main.py scrape-author "<homepage_url>" --folder <folder> --recent-count 8
 python main.py scrape-author "<url>" --folder <folder> --structure-only
 python main.py scrape-author "<url>" --folder <folder> --no-comments
 python main.py scrape-author "<url>" --folder <folder> --headless      # 默认带界面，加此参数强制无头
-python main.py scrape-author "<url>" --folder <folder> --ui-comments   # incl. 二级评论
+python main.py scrape-author "<url>" --folder <folder> --api-comments   # 切换为纯 API 模式（默认已用模拟点击含二级评论）
 ```
 
 Omit `--folder` to create the bitable in the app's own space. Creating inside a
@@ -158,7 +158,7 @@ signature-blocked, it retries from a browser context, then falls back to the
 ## Notes & limits
 
 - Play count is always 0 from the Web API (Douyin blocks it for third parties).
-- Reply (L2) comments come from the UI-click scraper (`--ui-comments`); the raw
-  reply API is `bd-ticket-guard`'d and returns empty to hand-built requests.
+- 评论默认使用模拟点击模式（含二级评论）；如需切换为纯 API 模式加 `--api-comments`。
+  原始 reply API 有 `bd-ticket-guard` 保护，手工请求会返回空。
 - Browser defaults to headed (visible) to reduce anti-bot detection risk; pass `--headless` only if needed.
 - Cookies expire after ~60 days — re-run `python main.py login`.

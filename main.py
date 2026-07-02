@@ -202,14 +202,14 @@ async def _search_users(names):
               help="检测不到置顶标记(is_top)时回退跳过的前 N 条置顶视频（默认 3，即取第4-8条）")
 @click.option("--no-comments", is_flag=True, help="只抓作者信息+作品，跳过一/二级评论")
 @click.option("--headless", is_flag=True, help="使用无头浏览器（默认带界面，降低被识别封号风险）")
-@click.option("--ui-comments", is_flag=True, help="用模拟点击(真人登录态)抓评论，含二级评论")
+@click.option("--api-comments", is_flag=True, help="用 API 模式抓评论（默认模拟点击含二级评论，此参数切换为纯 API）")
 @click.option("--structure-only", is_flag=True, help="只新建 5 张表结构，不抓数据")
 @click.option("--cdp", "cdp_endpoint", default="",
               help="连接已登录 Chrome 的 CDP 端点（如 http://localhost:9222），免 Cookie")
 @click.option("--date-from", default="", help="只保留该日期之后的作品（YYYY-MM-DD）")
 @click.option("--date-to", default="", help="只保留该日期之前的作品（YYYY-MM-DD）")
 def scrape_author(url, folder, name, recent_count, skip_top,
-                  no_comments, headless, ui_comments, structure_only, cdp_endpoint,
+                  no_comments, headless, api_comments, structure_only, cdp_endpoint,
                   date_from, date_to):
     """从作者主页链接抓取：作者信息(粉丝量) + 选定作品(封面/视频/图片/点赞评论收藏) + 评论，写入 5 表多维表格。
 
@@ -228,13 +228,13 @@ def scrape_author(url, folder, name, recent_count, skip_top,
         return
     asyncio.run(_scrape_author(
         url, _folder_token(folder), name, recent_count, skip_top,
-        no_comments, headless, ui_comments, structure_only, cdp,
+        no_comments, headless, api_comments, structure_only, cdp,
         _parse_date(date_from), _parse_date(date_to),
     ))
 
 
 async def _scrape_author(url, folder_token, name, recent_count, skip_top,
-                         no_comments, headless, ui_comments, structure_only, cdp_endpoint="",
+                         no_comments, headless, api_comments, structure_only, cdp_endpoint="",
                          date_from=0, date_to=0):
     # 1. Create the 5-table bitable (作者信息 + 视频作品 + 图文作品 + 一级评论 + 二级评论).
     feishu = FeishuBitable()
@@ -271,8 +271,8 @@ async def _scrape_author(url, folder_token, name, recent_count, skip_top,
             pipeline.USE_CDP = cdp_endpoint
         if headless:
             pipeline.HEADLESS = True
-        if ui_comments:
-            pipeline.USE_UI_COMMENTS = True
+        if api_comments:
+            pipeline.USE_UI_COMMENTS = False
         await pipeline.main_author()
 
     click.echo("\n=== 作者多维表格已就绪 ===")
@@ -299,13 +299,13 @@ async def _scrape_author(url, folder_token, name, recent_count, skip_top,
               help="检测不到置顶标记(is_top)时回退跳过的前 N 条置顶视频（默认 3，即取第4-8条）")
 @click.option("--no-comments", is_flag=True, help="只抓作者信息+作品，跳过一/二级评论")
 @click.option("--headless", is_flag=True, help="使用无头浏览器（默认带界面，降低被识别封号风险）")
-@click.option("--ui-comments", is_flag=True, help="用模拟点击(真人登录态)抓评论，含二级评论")
+@click.option("--api-comments", is_flag=True, help="用 API 模式抓评论（默认模拟点击含二级评论，此参数切换为纯 API）")
 @click.option("--cdp", "cdp_endpoint", default="",
               help="连接已登录 Chrome 的 CDP 端点（如 http://localhost:9222），免 Cookie")
 @click.option("--date-from", default="", help="只保留该日期之后的作品（YYYY-MM-DD）")
 @click.option("--date-to", default="", help="只保留该日期之前的作品（YYYY-MM-DD）")
 def scrape_batch(authors, folder, name, recent_count, skip_top,
-                 no_comments, headless, ui_comments, cdp_endpoint,
+                 no_comments, headless, api_comments, cdp_endpoint,
                  date_from, date_to):
     """批量采集多个作者主页，所有数据写入同一张多维表格。
 
@@ -325,7 +325,7 @@ def scrape_batch(authors, folder, name, recent_count, skip_top,
         return
     asyncio.run(_scrape_batch(
         list(authors), _folder_token(folder), name, recent_count, skip_top,
-        no_comments, headless, ui_comments, cdp,
+        no_comments, headless, api_comments, cdp,
         _parse_date(date_from), _parse_date(date_to),
     ))
 
@@ -374,7 +374,7 @@ async def _resolve_authors(authors):
 
 
 async def _scrape_batch(authors, folder_token, name, recent_count, skip_top,
-                        no_comments, headless, ui_comments, cdp_endpoint="",
+                        no_comments, headless, api_comments, cdp_endpoint="",
                         date_from=0, date_to=0):
     urls = await _resolve_authors(authors)
     if not urls:
@@ -412,8 +412,8 @@ async def _scrape_batch(authors, folder_token, name, recent_count, skip_top,
         pipeline.USE_CDP = cdp_endpoint
     if headless:
         pipeline.HEADLESS = True
-    if ui_comments:
-        pipeline.USE_UI_COMMENTS = True
+    if api_comments:
+        pipeline.USE_UI_COMMENTS = False
     await pipeline.main_batch(urls)
 
     click.echo(f"\n=== 批量多维表格已就绪 ===")
