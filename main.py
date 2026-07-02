@@ -130,6 +130,54 @@ async def _login(timeout=480):
 
 
 # --------------------------------------------------------------------------- #
+# search — find author homepage URLs by name                                    #
+# --------------------------------------------------------------------------- #
+@cli.command(name="search")
+@click.argument("names", nargs=-1, required=True)
+def search_cmd(names):
+    """按作者昵称搜索抖音主页 URL。
+
+    用法：python main.py search "清华凌霄学习舅" "于泽老师的思维课"
+    """
+    if not DOUYIN_COOKIE:
+        click.echo("需要 DOUYIN_COOKIE 才能调用搜索接口。在 .env 配置或运行 python main.py login")
+        return
+    asyncio.run(_search_users(list(names)))
+
+
+async def _search_users(names):
+    from core.client import DouyinClient
+    from config.settings import DOUYIN_API_BASE as api_base
+    async with DouyinClient(cookies=DOUYIN_COOKIE) as client:
+        for name in names:
+            params = {
+                'device_platform': 'webapp', 'aid': '6383',
+                'keyword': name, 'search_channel': 'aweme_user_web',
+                'search_source': 'normal_search', 'query_correct_type': '1',
+                'is_filter_search': '0', 'offset': '0', 'count': '5',
+                'cookie_enabled': 'true', 'platform': 'PC',
+            }
+            data = await client.get(f'{api_base}/general/search/single/', params)
+            if data.get('status_code') != 0:
+                click.echo(f'[{name}] search failed (status={data.get("status_code")})')
+                continue
+            found = False
+            for item in (data.get('data') or []):
+                for u in (item.get('user_list') or []):
+                    info = u.get('user_info') or {}
+                    nick = info.get('nickname', '')
+                    sec_uid = info.get('sec_uid', '')
+                    fans = info.get('follower_count', 0)
+                    if sec_uid and not found:
+                        url = f'https://www.douyin.com/user/{sec_uid}'
+                        click.echo(f'{nick} | {fans} fans | {url}')
+                        found = True
+            if not found:
+                click.echo(f'[{name}] no results')
+            await asyncio.sleep(2)
+
+
+# --------------------------------------------------------------------------- #
 # scrape-author — the one real command                                          #
 # --------------------------------------------------------------------------- #
 @cli.command(name="scrape-author")
@@ -223,7 +271,7 @@ async def _scrape_author(url, folder_token, name, recent_count, skip_top,
 # scrape-batch — batch mode for multiple authors                                #
 # --------------------------------------------------------------------------- #
 @cli.command(name="scrape-batch")
-@click.argument("urls", nargs=-1, required=True)
+@click.argument("authors", nargs=-1, required=True)
 @click.option("--folder", help="飞书文件夹 token 或 URL（新建多维表格的位置；留空建在应用空间）")
 @click.option("--name", default="抖音作者数据-批量", help="新建多维表格的名称")
 @click.option("--recent-count", type=int, default=5, help="保留的作品数量（默认最近 5 条）")
@@ -234,16 +282,17 @@ async def _scrape_author(url, folder_token, name, recent_count, skip_top,
 @click.option("--ui-comments", is_flag=True, help="用模拟点击(真人登录态)抓评论，含二级评论")
 @click.option("--cdp", "cdp_endpoint", default="",
               help="连接已登录 Chrome 的 CDP 端点（如 http://localhost:9222），免 Cookie")
-def scrape_batch(urls, folder, name, recent_count, skip_top,
+def scrape_batch(authors, folder, name, recent_count, skip_top,
                  no_comments, headless, ui_comments, cdp_endpoint):
-    """批量采集多个作者主页：传入多个作者主页 URL，一次建一张多维表格，所有作者的数据写入同一张表。
+    """批量采集多个作者主页，所有数据写入同一张多维表格。
 
-    用法示例：
-      python main.py scrape-batch URL1 URL2 URL3 --folder <飞书文件夹>
-      python main.py scrape-batch URL1 URL2 --cdp http://localhost:9222
+    参数可以是作者主页 URL 或者作者昵称（自动搜索），也可以混合使用：
+
+      python main.py scrape-batch "清华凌霄学习舅" "于泽老师的思维课" --folder <飞书文件夹>
+      python main.py scrape-batch URL1 URL2 "作者昵称" --cdp http://localhost:9222
     """
-    if not urls:
-        click.echo("请至少提供一个作者主页 URL。")
+    if not authors:
+        click.echo("请至少提供一个作者主页 URL 或昵称。")
         return
     cdp = cdp_endpoint or CDP_ENDPOINT
     if not DOUYIN_COOKIE and not cdp:
@@ -252,13 +301,60 @@ def scrape_batch(urls, folder, name, recent_count, skip_top,
         click.echo("方式二: 启动 Chrome 时带 --remote-debugging-port=9222，登录抖音后用 --cdp http://localhost:9222")
         return
     asyncio.run(_scrape_batch(
-        list(urls), _folder_token(folder), name, recent_count, skip_top,
+        list(authors), _folder_token(folder), name, recent_count, skip_top,
         no_comments, headless, ui_comments, cdp,
     ))
 
 
-async def _scrape_batch(urls, folder_token, name, recent_count, skip_top,
+async def _resolve_authors(authors):
+    """Turn a mixed list of URLs and author names into a list of homepage URLs."""
+    from core.client import DouyinClient
+    from config.settings import DOUYIN_API_BASE as api_base
+    urls = []
+    names_to_search = []
+    for a in authors:
+        if 'douyin.com/user/' in a or a.startswith('http'):
+            urls.append(a)
+        else:
+            names_to_search.append(a)
+    if names_to_search:
+        click.echo(f"搜索 {len(names_to_search)} 个作者昵称...")
+        import asyncio as _aio
+        async with DouyinClient(cookies=DOUYIN_COOKIE) as client:
+            for n in names_to_search:
+                params = {
+                    'device_platform': 'webapp', 'aid': '6383',
+                    'keyword': n, 'search_channel': 'aweme_user_web',
+                    'search_source': 'normal_search', 'query_correct_type': '1',
+                    'is_filter_search': '0', 'offset': '0', 'count': '5',
+                    'cookie_enabled': 'true', 'platform': 'PC',
+                }
+                data = await client.get(f'{api_base}/general/search/single/', params)
+                found = False
+                if data.get('status_code') == 0:
+                    for item in (data.get('data') or []):
+                        for u in (item.get('user_list') or []):
+                            info = u.get('user_info') or {}
+                            sec_uid = info.get('sec_uid', '')
+                            nick = info.get('nickname', '')
+                            fans = info.get('follower_count', 0)
+                            if sec_uid and not found:
+                                url = f'https://www.douyin.com/user/{sec_uid}'
+                                click.echo(f"  {nick} | {fans} fans -> {url}")
+                                urls.append(url)
+                                found = True
+                if not found:
+                    click.echo(f"  [!] 未找到「{n}」，跳过")
+                await _aio.sleep(2)
+    return urls
+
+
+async def _scrape_batch(authors, folder_token, name, recent_count, skip_top,
                         no_comments, headless, ui_comments, cdp_endpoint=""):
+    urls = await _resolve_authors(authors)
+    if not urls:
+        click.echo("没有可处理的作者 URL，退出。")
+        return
     click.echo(f"批量模式：{len(urls)} 个作者")
 
     feishu = FeishuBitable()
